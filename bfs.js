@@ -13,41 +13,35 @@ var utils = require('./lib/utils.js');
 var HyperLogSandwich = require('./lib/hyperlog-sandwich');
 
 var max = 15;
-var i, bf, hll, hll2, fCounts;
+var trials = 5;
+var i, bf, hll, hll2, fCounts, output = [];
 
 // Generate a buncha data
-for(var t = 0; t < 10 ; t++) {
-  var hls = new HyperLogSandwich(max);
+for(var t = 1; t < trials ; t++) {
+  for(var s = 0; s < 5; s++) {
+  var epsilon = 1/(Math.pow(10,t));
+  var hls = new HyperLogSandwich(max, null, null, null, null, epsilon);
+  console.log(epsilon);
   var inputSet    = []
-    , streamSize  = t * 10000;//Math.pow(2, 5 + t);
+    , streamSize  =  100000;
 
   (function (i) {
     // console.log('Generating dataset');
     for (i = 0; i <= streamSize; i++) {
       inputSet.push(Math.random().toString());
     }
-
-    // console.log('Inserting dupes');
-    for (i = 0 ; i < 10; i++) {
-      inputSet = utils.insertDups(inputSet);
-    }
-    // skew
-    for (i = 0 ; i < 1000; i++) {
-      inputSet.push(inputSet[0]);
-      inputSet.push(inputSet[1]);
-      if (Math.random() > .5) { inputSet.push(inputSet[2]); }
-    }
+    inputSet = utils.insertDups(inputSet, max);
     stream = inputSet;
-    // console.log('dataset size: ', stream.length);
   })();
-  // stream = ['1','2','3','4','5','6','9','9','9','9'];
 
   // HyperLogSandwich
   var frequency, item;
   (function () {
     // console.log('Inserting HyperLogSandwich');
     for(i = 0; i < stream.length; i++) {
-      // if (i % 100000 == 0) { console.log( (Math.floor(i / stream.length * 1000) / 10) + '%'); }
+      if (i % 100000 == 0) {
+        console.log(t + '/' + trials, (Math.floor(i / stream.length * 1000) / 10) + '%');
+      }
       hls.add(stream[i]);
     }
   })();
@@ -86,10 +80,10 @@ for(var t = 0; t < 10 ; t++) {
 
   // Output the results
   (function () {
-    var i, avgErrHLS = 0, avgErrBloom = 0, avgErrCMS = 0;
+    var i, avgErrHLS = 0, avgErrBloom = 0, avgErrCMS = 0, errCMS = [];
     var cmsDepth = [];
-    cmsDepth.push(streamSize);
-    // console.log(['Freq', 'Est', 'BChain', 'CMS', 'Actual', 'Err%', 'Err2%', 'Err3%'].join('\t'));
+    cmsDepth.push(epsilon);
+    // console.log(['Freq', 'Est', 'BChain', 'CMS', 'Actual', 'Err%', 'Err2%', 'Err3%'].join(',\t'));
 
     for(i = 0; i < max; i++) {
       var estimate  = hls.get(i) || 0;
@@ -105,12 +99,42 @@ for(var t = 0; t < 10 ; t++) {
       avgErrBloom += errorBloom;
       avgErrHLS   += errorHLS;
 
-      // console.log([i, estimate, bChain, cms, actual, errorHLS, errorBloom, errorCMS].join(',') + '%');
-      cmsDepth.push(errorHLS);
-    }
-    console.log(cmsDepth.join(', '));
+      errCMS.push(errorCMS);
 
+      // console.log([i, estimate, bChain, cms, actual, errorHLS, errorBloom, errorCMS].join(',\t') + '%');
+      cmsDepth.push(errorCMS);
+    }
+    // console.log(cmsDepth.join(', '));
+    var medianErrorCMS = errCMS.sort()[Math.floor(errCMS.length / 2)];
     function s (a) { return Math.floor(a * 1000) / 1000; }
+    // output.push([streamSize, s(avgErrCMS/max), medianErrorCMS]);
+    output.push(cmsDepth);
     // console.log([streamSize, s(avgErrCMS/max), s(avgErrBloom/max), s(avgErrHLS/max)].join(', '));
   })();
+}}
+
+var out = {}
+for(i = 0; i < output.length; i++) {
+  // console.log(output[i].join(','));
+  if (!out[output[i][0]]) {
+    out[output[i][0]] = [];
+  }
+  out[output[i][0]].push(output[i]);
 }
+for(o in out) {
+  arr = out[o][0];
+  for(i = 1; i < out[o].length; i++) {
+    for(k = 0 ; k < out[o][0].length; k++) {
+      arr[k]+= out[o][i][k];
+    }
+  }
+  out[o] = arr;
+  for(i = 0; i < out[o].length; i++) {
+    out[o][i] = out[o][i]/5;
+  }
+}
+
+for(i in out) {
+  console.log(out[i].join(', '));
+}
+// console.log(out);
