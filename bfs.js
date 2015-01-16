@@ -86,10 +86,10 @@ for(var t = 1; t < trials ; t++) {
     // console.log(['Freq', 'Est', 'BChain', 'CMS', 'Actual', 'Err%', 'Err2%', 'Err3%'].join(',\t'));
 
     for(i = 0; i < max; i++) {
-      var estimate  = hls.get(i) || 0;
+      var estimate  = hls.getBloomCount(i) || 0;
       var actual    = freqMapCount[i] || 0;
-      var cms       = hls.getCMSCount(i) || 0;
-      var bChain    = hls.getBloomCount(i) || 0;
+      var cms       = hls.get(i) || 0;
+      var bChain    = hls.getBloomCount2(i) || 0;
 
       var errorHLS    = calcError(estimate, actual);
       var errorBloom  = calcError(bChain, actual);
